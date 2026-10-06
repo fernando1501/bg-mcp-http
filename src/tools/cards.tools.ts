@@ -12,7 +12,7 @@ import {
 } from '../api/cards.js';
 import { getPensionState, getPensionStatement } from '../api/pension.js';
 import { toLocalDate } from '../api/normalize.js';
-import { errorResult, guarded, jsonResult } from './helpers.js';
+import { errorResult, guarded, jsonResult, validateOptionalPeriod } from './helpers.js';
 
 export function registerCardTools(server: McpServer): void {
     server.registerTool(
@@ -25,12 +25,27 @@ export function registerCardTools(server: McpServer): void {
                 'the history of past cutoff dates so you can pick another period.',
             inputSchema: {
                 portalId: z.number().int().describe('Credit card portalId from bg_list_accounts.'),
-                month: z.number().int().min(1).max(12).optional().describe('1-based month.'),
-                year: z.number().int().min(2000).max(2100).optional().describe('Four-digit year.'),
+                month: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .max(12)
+                    .optional()
+                    .describe('1-based month. Provide together with year, or omit both.'),
+                year: z
+                    .number()
+                    .int()
+                    .min(2000)
+                    .max(2100)
+                    .optional()
+                    .describe('Four-digit year. Provide together with month, or omit both.'),
             },
         },
         guarded(
             async ({ portalId, month, year }: { portalId: number; month?: number; year?: number }) => {
+                const periodError = validateOptionalPeriod(month, year);
+                if (periodError) return periodError;
+
                 const account = await findAccount(portalId);
                 if (!account) {
                     return errorResult(`No product with portalId ${portalId}.`, 'ACCOUNT_NOT_FOUND');
@@ -76,12 +91,27 @@ export function registerCardTools(server: McpServer): void {
                 'current period. This is the bank\'s categorization, not a computed one.',
             inputSchema: {
                 portalId: z.number().int().describe('Credit card portalId from bg_list_accounts.'),
-                month: z.number().int().min(1).max(12).optional().describe('1-based month.'),
-                year: z.number().int().min(2000).max(2100).optional().describe('Four-digit year.'),
+                month: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .max(12)
+                    .optional()
+                    .describe('1-based month. Provide together with year, or omit both.'),
+                year: z
+                    .number()
+                    .int()
+                    .min(2000)
+                    .max(2100)
+                    .optional()
+                    .describe('Four-digit year. Provide together with month, or omit both.'),
             },
         },
         guarded(
             async ({ portalId, month, year }: { portalId: number; month?: number; year?: number }) => {
+                const periodError = validateOptionalPeriod(month, year);
+                if (periodError) return periodError;
+
                 const account = await findAccount(portalId);
                 if (!account) {
                     return errorResult(`No product with portalId ${portalId}.`, 'ACCOUNT_NOT_FOUND');

@@ -20,6 +20,11 @@ export function errorResult(message: string, code?: string): ToolResult {
     };
 }
 
+export function validateOptionalPeriod(month?: number, year?: number): ToolResult | null {
+    if ((month === undefined) === (year === undefined)) return null;
+    return errorResult('month and year must be provided together, or both omitted.', 'INVALID_ARGS');
+}
+
 export function guarded<A>(handler: (args: A) => Promise<ToolResult>) {
     return async (args: A): Promise<ToolResult> => {
         try {

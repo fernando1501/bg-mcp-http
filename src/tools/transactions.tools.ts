@@ -7,7 +7,7 @@ import { findAccount, getPendingPurchases } from '../api/accounts.js';
 import { getCardMovements, normalizeCardMovements } from '../api/cards.js';
 import { clampToDateRange, parseLocalDate } from '../api/normalize.js';
 import { getSavingsMovements, normalizeSavingsMovements } from '../api/savings.js';
-import { errorResult, guarded, jsonResult, limited } from './helpers.js';
+import { errorResult, guarded, jsonResult, limited, validateOptionalPeriod } from './helpers.js';
 
 const isoDate = z
     .string()
@@ -149,8 +149,14 @@ export function registerTransactionTools(server: McpServer): void {
                     .min(1)
                     .max(12)
                     .optional()
-                    .describe('1-based month. Omit (with year) for the current statement period.'),
-                year: z.number().int().min(2000).max(2100).optional().describe('Four-digit year.'),
+                    .describe('1-based month. Provide together with year, or omit both.'),
+                year: z
+                    .number()
+                    .int()
+                    .min(2000)
+                    .max(2100)
+                    .optional()
+                    .describe('Four-digit year. Provide together with month, or omit both.'),
                 clampToMonth: z
                     .boolean()
                     .optional()
@@ -173,6 +179,9 @@ export function registerTransactionTools(server: McpServer): void {
                 clampToMonth?: boolean;
                 limit?: number;
             }) => {
+                const periodError = validateOptionalPeriod(month, year);
+                if (periodError) return periodError;
+
                 const account = await findAccount(portalId);
                 if (!account) {
                     return errorResult(

@@ -112,6 +112,38 @@ test('rejects an incorrect URL token', async () => {
     assert.equal(response.status, 401);
 });
 
+test('card tools reject an incomplete period before calling Banco General', async () => {
+    process.env['MCP_BEARER_TOKEN'] = 'test-secret';
+
+    for (const name of [
+        'bg_list_card_transactions',
+        'bg_get_card_statement',
+        'bg_get_card_categories',
+    ]) {
+        const response = await app.request('/mcp?token=test-secret', {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json, text/event-stream',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/call',
+                params: { name, arguments: { portalId: 1, month: 9 } },
+            }),
+        });
+        const body = (await response.json()) as {
+            result?: { isError?: boolean; content?: Array<{ type: string; text?: string }> };
+        };
+        const resultText = body.result?.content?.find((item) => item.type === 'text')?.text ?? '{}';
+
+        assert.equal(response.status, 200, name);
+        assert.equal(body.result?.isError, true, name);
+        assert.equal(JSON.parse(resultText).code, 'INVALID_ARGS', name);
+    }
+});
+
 function restore(name: string, value: string | undefined): void {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
