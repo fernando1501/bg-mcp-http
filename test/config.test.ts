@@ -39,6 +39,17 @@ test('supports the deprecated single-answer fallback', () => {
     );
 });
 
+test('does not use a legacy fallback when a JSON answer map is active', () => {
+    const securityAnswers = parseSecurityAnswers('{"Known question":"known-answer"}');
+    assert.equal(
+        resolveSecurityAnswer('Unknown question', {
+            securityAnswers,
+            legacySecurityAnswer: undefined,
+        }),
+        null,
+    );
+});
+
 test('rejects malformed or empty answer maps', () => {
     assert.throws(() => parseSecurityAnswers('not-json'), /valid JSON object/);
     assert.throws(() => parseSecurityAnswers('[]'), /JSON object/);

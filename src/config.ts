@@ -36,7 +36,9 @@ export function getBankCredentials(): BankCredentials {
         username: required('BG_USERNAME'),
         password: required('BG_PASSWORD'),
         securityAnswers: answersJson ? parseSecurityAnswers(answersJson) : {},
-        legacySecurityAnswer,
+        // The legacy value is used only when no JSON map is configured. This
+        // prevents an old fallback from answering an unknown mapped question.
+        legacySecurityAnswer: answersJson ? undefined : legacySecurityAnswer,
     };
 }
 
