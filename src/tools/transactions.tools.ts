@@ -138,9 +138,13 @@ export function registerTransactionTools(server: McpServer): void {
         {
             title: 'List credit card transactions',
             description:
-                'Charges and payments on a credit card for a statement period. Pass month/year for a specific ' +
-                'period, or omit both for the current one. A BG statement period is not a calendar month — it ' +
-                'runs from the previous cutoff date — so set clampToMonth to restrict results to the calendar month.',
+                'Charges and payments for one credit-card statement period. IMPORTANT: month/year are NOT a ' +
+                'calendar-month search; they identify a CLOSED statement by its cutoff month and year. For the ' +
+                'current open statement, today, or a recent date after the latest cutoff, OMIT both month and ' +
+                'year. The server converts that omission to BG month=0/year=0. Never pass the current calendar ' +
+                'month/year just to find a date: BG can return 400 Error de WS until that statement closes. For ' +
+                'historical periods, call bg_get_card_statement first and select month/year from an available ' +
+                'statementHistory.cutDateLocal. Filter the returned transactions by date when looking for one day.',
             inputSchema: {
                 portalId: z.number().int().describe('Credit card portalId from bg_list_accounts.'),
                 month: z
@@ -149,19 +153,29 @@ export function registerTransactionTools(server: McpServer): void {
                     .min(1)
                     .max(12)
                     .optional()
-                    .describe('1-based month. Provide together with year, or omit both.'),
+                    .describe(
+                        'Cutoff month of an already CLOSED statement, not a calendar-month filter. Provide with ' +
+                            'year only when that cutoff appears in bg_get_card_statement.statementHistory; omit ' +
+                            'both fields for the current open statement (server sends BG 0/0).',
+                    ),
                 year: z
                     .number()
                     .int()
                     .min(2000)
                     .max(2100)
                     .optional()
-                    .describe('Four-digit year. Provide together with month, or omit both.'),
+                    .describe(
+                        'Cutoff year of an already CLOSED statement. Provide with month only for a cutoff listed ' +
+                            'in statementHistory; omit both fields for the current open statement.',
+                    ),
                 clampToMonth: z
                     .boolean()
                     .optional()
                     .default(false)
-                    .describe('Drop transactions outside the given calendar month. Requires month and year.'),
+                    .describe(
+                        'For a CLOSED historical statement only, drop transactions outside the supplied cutoff ' +
+                            'calendar month. Requires month and year. Do not use for the current open statement.',
+                    ),
                 limit: z.number().int().positive().optional().describe('Cap the number returned.'),
             },
         },

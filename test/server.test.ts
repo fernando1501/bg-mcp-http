@@ -71,11 +71,14 @@ test('serves an authenticated MCP initialize request over JSON HTTP', async () =
         }),
     });
     const body = (await response.json()) as {
-        result?: { serverInfo?: { name?: string } };
+        result?: { instructions?: string; serverInfo?: { name?: string } };
     };
 
     assert.equal(response.status, 200);
     assert.equal(body.result?.serverInfo?.name, 'bg-mcp-http');
+    assert.match(body.result?.instructions ?? '', /OMIT both month and year/);
+    assert.match(body.result?.instructions ?? '', /month=0\/year=0/);
+    assert.match(body.result?.instructions ?? '', /statementHistory/);
 });
 
 test('serves an MCP initialize request authenticated by URL token', async () => {
@@ -142,6 +145,35 @@ test('card tools reject an incomplete period before calling Banco General', asyn
         assert.equal(body.result?.isError, true, name);
         assert.equal(JSON.parse(resultText).code, 'INVALID_ARGS', name);
     }
+});
+
+test('publishes credit-card cutoff semantics in the MCP tool schema', async () => {
+    process.env['MCP_BEARER_TOKEN'] = 'test-secret';
+    const response = await app.request('/mcp?token=test-secret', {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json, text/event-stream',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    const body = (await response.json()) as {
+        result?: {
+            tools?: Array<{
+                name: string;
+                description?: string;
+                inputSchema?: { properties?: Record<string, { description?: string }> };
+            }>;
+        };
+    };
+    const tool = body.result?.tools?.find(({ name }) => name === 'bg_list_card_transactions');
+
+    assert.equal(response.status, 200);
+    assert.match(tool?.description ?? '', /OMIT both month and year/);
+    assert.match(tool?.description ?? '', /month=0\/year=0/);
+    assert.match(tool?.description ?? '', /statementHistory\.cutDateLocal/);
+    assert.match(tool?.inputSchema?.properties?.['month']?.description ?? '', /CLOSED statement/);
+    assert.match(tool?.inputSchema?.properties?.['year']?.description ?? '', /current open statement/);
 });
 
 function restore(name: string, value: string | undefined): void {

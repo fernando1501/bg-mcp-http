@@ -21,8 +21,10 @@ export function registerCardTools(server: McpServer): void {
             title: 'Get credit card statement',
             description:
                 'Statement for a credit card: balance, minimum payment, cutoff and due dates, credit plans and ' +
-                'rates. Pass month/year for a past statement, or omit both for the current period. Also returns ' +
-                'the history of past cutoff dates so you can pick another period.',
+                'rates. OMIT month/year for the current open statement (the server sends BG 0/0). Explicit ' +
+                'month/year identify a CLOSED statement by cutoff month, not a calendar month, and must be chosen ' +
+                'from statementHistory.cutDateLocal. Passing a month whose cutoff has not occurred can produce ' +
+                'BG 400 Error de WS. This tool returns the cutoff history needed to choose a historical period.',
             inputSchema: {
                 portalId: z.number().int().describe('Credit card portalId from bg_list_accounts.'),
                 month: z
@@ -31,14 +33,20 @@ export function registerCardTools(server: McpServer): void {
                     .min(1)
                     .max(12)
                     .optional()
-                    .describe('1-based month. Provide together with year, or omit both.'),
+                    .describe(
+                        'Cutoff month from statementHistory for a CLOSED statement. Omit with year for the ' +
+                            'current open statement; omission is translated to BG month=0/year=0.',
+                    ),
                 year: z
                     .number()
                     .int()
                     .min(2000)
                     .max(2100)
                     .optional()
-                    .describe('Four-digit year. Provide together with month, or omit both.'),
+                    .describe(
+                        'Cutoff year from statementHistory for a CLOSED statement. Omit with month for the ' +
+                            'current open statement.',
+                    ),
             },
         },
         guarded(
@@ -87,8 +95,10 @@ export function registerCardTools(server: McpServer): void {
             title: 'Get credit card spending by category',
             description:
                 "Banco General's own spend-by-category breakdown for a card statement period (Comida y Bebida, " +
-                'Transporte, Supermercados, etc.), with transaction counts and totals. Omit month/year for the ' +
-                'current period. This is the bank\'s categorization, not a computed one.',
+                'Transporte, Supermercados, etc.), with transaction counts and totals. OMIT month/year for the ' +
+                'current open statement (server sends BG 0/0). Explicit month/year are only for a CLOSED statement ' +
+                'whose cutoff appears in bg_get_card_statement.statementHistory; they are not a calendar-month ' +
+                'filter. This is the bank\'s categorization, not a computed one.',
             inputSchema: {
                 portalId: z.number().int().describe('Credit card portalId from bg_list_accounts.'),
                 month: z
@@ -97,14 +107,20 @@ export function registerCardTools(server: McpServer): void {
                     .min(1)
                     .max(12)
                     .optional()
-                    .describe('1-based month. Provide together with year, or omit both.'),
+                    .describe(
+                        'Cutoff month for a CLOSED statement listed in statementHistory. Omit with year for the ' +
+                            'current open statement; omission is translated to BG 0/0.',
+                    ),
                 year: z
                     .number()
                     .int()
                     .min(2000)
                     .max(2100)
                     .optional()
-                    .describe('Four-digit year. Provide together with month, or omit both.'),
+                    .describe(
+                        'Cutoff year for a CLOSED statement listed in statementHistory. Omit with month for the ' +
+                            'current open statement.',
+                    ),
             },
         },
         guarded(

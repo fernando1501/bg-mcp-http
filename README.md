@@ -139,3 +139,23 @@ El proyecto conserva las tools de consulta del servidor original:
 - `bg_spending_summary`
 
 Empieza por `bg_list_accounts`; devuelve los `portalId` que requieren las demás.
+
+### Períodos de tarjetas de crédito
+
+Banco General no interpreta `month` y `year` como un filtro de mes calendario.
+Esos valores identifican un **estado de cuenta ya cerrado** por el mes y año de
+su fecha de corte. Por ejemplo, si el último corte disponible es el 7 de
+septiembre, enviar octubre antes del corte de octubre puede producir
+`400 · Error de WS`.
+
+- Para el ciclo abierto, movimientos recientes o una fecha posterior al último
+  corte, omite tanto `month` como `year`. El MCP enviará internamente
+  `{ "month": 0, "year": 0 }` a Banco General.
+- Para un estado histórico, llama primero `bg_get_card_statement` sin mes ni año
+  y revisa `statementHistory[].cutDateLocal`. Usa únicamente el mes y año de una
+  fecha de corte que aparezca allí.
+- Para buscar un día concreto dentro del ciclo abierto, llama
+  `bg_list_card_transactions` sin mes ni año y filtra por el campo `date` de los
+  movimientos devueltos.
+- Nunca envíes literalmente cero en la llamada MCP: el agente debe omitir ambos
+  parámetros; la conversión a `0/0` ocurre dentro del servidor.

@@ -13,7 +13,13 @@ export function createMcpServer(): McpServer {
                 'Read-only access to Banco General accounts. Authentication to the bank is automatic and ' +
                 'server-side; never ask the user for bank credentials and never attempt to call login tools. ' +
                 'Start with bg_list_accounts to obtain the portalId required by the other tools. All dates are ' +
-                'Panama local time (UTC-5). Balances reflect Banco General\'s lastSyncDate.',
+                'Panama local time (UTC-5). Balances reflect Banco General\'s lastSyncDate. Credit-card month/year ' +
+                'identify a CLOSED statement by its cutoff month, not a calendar month. For the current open ' +
+                'statement or any recent date after the latest cutoff, OMIT both month and year; the server then ' +
+                'sends Banco General month=0/year=0. Never pass the current calendar month/year merely to search ' +
+                'for a date, because BG returns 400 Error de WS for a statement that has not closed. To choose a ' +
+                'historical period, first read statementHistory from bg_get_card_statement and use the month/year ' +
+                'of an available cutDateLocal.',
         },
     );
 
