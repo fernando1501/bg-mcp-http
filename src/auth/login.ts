@@ -9,7 +9,7 @@ import {
     type Page,
 } from 'playwright-core';
 
-import { BASE, getBankCredentials } from '../config.js';
+import { BASE, getBankCredentials, resolveSecurityAnswer } from '../config.js';
 import { loadSession, looksAuthenticated, saveSession, type StorageState } from './session.js';
 
 export class LoginError extends Error {
@@ -94,8 +94,16 @@ async function loginFromEnvironment(): Promise<void> {
             );
         }
 
+        const securityAnswer = resolveSecurityAnswer(question, credentials);
+        if (!securityAnswer) {
+            throw new LoginError(
+                'SECURITY_ANSWER_NOT_CONFIGURED',
+                'Banco General requested a security question that is not configured in BG_SECURITY_ANSWERS_JSON.',
+            );
+        }
+
         const answerInput = await waitForLoginInput(page, 'text', 10_000);
-        await answerInput.fill(credentials.securityAnswer);
+        await answerInput.fill(securityAnswer);
         await submitCurrentForm(page);
 
         await requireUrl(page, [/login\/password/], 20_000, 'PASSWORD_SCREEN_NOT_REACHED');

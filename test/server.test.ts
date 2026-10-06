@@ -7,6 +7,7 @@ const savedEnvironment = {
     token: process.env['MCP_BEARER_TOKEN'],
     username: process.env['BG_USERNAME'],
     password: process.env['BG_PASSWORD'],
+    answersJson: process.env['BG_SECURITY_ANSWERS_JSON'],
     answer: process.env['BG_SECURITY_ANSWER'],
 };
 
@@ -14,6 +15,7 @@ test.afterEach(() => {
     restore('MCP_BEARER_TOKEN', savedEnvironment.token);
     restore('BG_USERNAME', savedEnvironment.username);
     restore('BG_PASSWORD', savedEnvironment.password);
+    restore('BG_SECURITY_ANSWERS_JSON', savedEnvironment.answersJson);
     restore('BG_SECURITY_ANSWER', savedEnvironment.answer);
 });
 
@@ -27,6 +29,7 @@ test('rejects MCP requests without the fixed bearer token', async () => {
 test('reports missing server configuration without exposing values', async () => {
     delete process.env['BG_USERNAME'];
     delete process.env['BG_PASSWORD'];
+    delete process.env['BG_SECURITY_ANSWERS_JSON'];
     delete process.env['BG_SECURITY_ANSWER'];
     process.env['MCP_BEARER_TOKEN'] = 'test-secret';
 
@@ -42,7 +45,7 @@ test('reports missing server configuration without exposing values', async () =>
         mcpBearerToken: true,
         bankUsername: false,
         bankPassword: false,
-        bankSecurityAnswer: false,
+        bankSecurityAnswers: false,
     });
     assert.equal(JSON.stringify(body).includes('test-secret'), false);
 });

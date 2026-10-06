@@ -12,7 +12,8 @@ del banco permanecen como secretos privados del servidor.
 - El MCP no publica tools de login ni recibe usuario, contraseña, respuesta de
   seguridad o rutas bancarias desde el agente.
 - El servidor inicia sesión automáticamente con `BG_USERNAME`, `BG_PASSWORD` y
-  `BG_SECURITY_ANSWER`.
+  el mapa `BG_SECURITY_ANSWERS_JSON`. Lee la pregunta que devuelve el banco y
+  selecciona únicamente su respuesta correspondiente.
 - El transporte MCP es stateless, compatible con funciones serverless. La
   sesión bancaria se conserva únicamente mientras la instancia esté caliente y
   se reconstruye automáticamente cuando Vercel crea otra instancia o el banco
@@ -31,12 +32,27 @@ del banco permanecen como secretos privados del servidor.
 | `MCP_BEARER_TOKEN` | Secret | Token fijo que debe enviar el cliente MCP |
 | `BG_USERNAME` | Secret | Usuario de Zona Segura |
 | `BG_PASSWORD` | Secret | Contraseña de Zona Segura |
-| `BG_SECURITY_ANSWER` | Secret | Respuesta a la pregunta de seguridad |
+| `BG_SECURITY_ANSWERS_JSON` | Secret | Objeto JSON que relaciona cada pregunta de seguridad con su respuesta |
+| `BG_SECURITY_ANSWER` | Secret, obsoleta | Fallback para instalaciones antiguas con una sola respuesta |
 | `BG_CHROMIUM_EXECUTABLE_PATH` | Opcional, local | Ruta a Chromium para desarrollo fuera de Vercel |
 
 Nunca subas un `.env` real. Copia [`.env.example`](.env.example) a `.env.local`
 solo para desarrollo; `.gitignore` excluye todos los archivos `.env*` salvo el
 ejemplo.
+
+Configura las preguntas tal como aparecen en Banco General. La comparación
+tolera diferencias de mayúsculas, espacios y signos finales de interrogación:
+
+```json
+{
+  "¿Cuál es el nombre de tu primera mascota?": "respuesta-uno",
+  "¿En qué ciudad naciste?": "respuesta-dos"
+}
+```
+
+Si el banco devuelve una pregunta que no está en el mapa, el login termina con
+`SECURITY_ANSWER_NOT_CONFIGURED`; la pregunta y las respuestas no se envían al
+agente ni se incluyen en el error.
 
 ## Desarrollo
 
