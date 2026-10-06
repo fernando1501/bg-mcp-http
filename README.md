@@ -157,5 +157,8 @@ septiembre, enviar octubre antes del corte de octubre puede producir
 - Para buscar un día concreto dentro del ciclo abierto, llama
   `bg_list_card_transactions` sin mes ni año y filtra por el campo `date` de los
   movimientos devueltos.
+- Si `bg_search_transactions` o `bg_spending_summary` informa una tarjeta en
+  `partialFailures`, no concluyas que no hubo movimientos. Confirma esa tarjeta
+  con `bg_list_card_transactions` sin mes ni año.
 - Nunca envíes literalmente cero en la llamada MCP: el agente debe omitir ambos
   parámetros; la conversión a `0/0` ocurre dentro del servidor.

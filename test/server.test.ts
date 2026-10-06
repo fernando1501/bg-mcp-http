@@ -174,6 +174,11 @@ test('publishes credit-card cutoff semantics in the MCP tool schema', async () =
     assert.match(tool?.description ?? '', /statementHistory\.cutDateLocal/);
     assert.match(tool?.inputSchema?.properties?.['month']?.description ?? '', /CLOSED statement/);
     assert.match(tool?.inputSchema?.properties?.['year']?.description ?? '', /current open statement/);
+
+    const searchTool = body.result?.tools?.find(({ name }) => name === 'bg_search_transactions');
+    const summaryTool = body.result?.tools?.find(({ name }) => name === 'bg_spending_summary');
+    assert.match(searchTool?.description ?? '', /partialFailures is not evidence/);
+    assert.match(summaryTool?.description ?? '', /OMITTING month\/year/);
 });
 
 function restore(name: string, value: string | undefined): void {

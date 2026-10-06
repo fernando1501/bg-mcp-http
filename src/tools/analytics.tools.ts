@@ -135,7 +135,9 @@ export function registerAnalyticsTools(server: McpServer): void {
                 'by description text and amount. Use this for questions like "how much did I spend at X" or ' +
                 '"find that $250 charge in March" — it saves calling the per-account tools one by one. ' +
                 'Covers pending purchases ("Compras en proceso") as well as posted movements, so a charge made ' +
-                'today is findable; those come back with source "pending".',
+                'today is findable; those come back with source "pending". For an exact current/recent credit-card ' +
+                'date, confirm with bg_list_card_transactions while OMITTING month/year so BG uses its open 0/0 ' +
+                'period. A card entry in partialFailures is not evidence that no matching charge exists.',
             inputSchema: {
                 fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Start date, YYYY-MM-DD (Panama time).'),
                 toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('End date, YYYY-MM-DD (Panama time).'),
@@ -215,7 +217,9 @@ export function registerAnalyticsTools(server: McpServer): void {
             title: 'Summarize income and spending for a period',
             description:
                 'Aggregates every account for a month (or an explicit date range): total income, total spending, ' +
-                'net, a per-account breakdown and the largest transactions. Use this for "how did I do this month".',
+                'net, a per-account breakdown and the largest transactions. Use this for "how did I do this month". ' +
+                'If current/recent card accuracy matters and a card appears in partialFailures, confirm it with ' +
+                'bg_list_card_transactions while OMITTING month/year so BG uses the current open 0/0 period.',
             inputSchema: {
                 month: z
                     .string()
