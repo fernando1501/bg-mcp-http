@@ -19,7 +19,7 @@ test.afterEach(() => {
     restore('BG_SECURITY_ANSWER', savedEnvironment.answer);
 });
 
-test('rejects MCP requests without the fixed bearer token', async () => {
+test('rejects MCP requests without a valid credential', async () => {
     process.env['MCP_BEARER_TOKEN'] = 'test-secret';
     const response = await app.request('/mcp', { method: 'POST' });
     assert.equal(response.status, 401);
@@ -76,6 +76,40 @@ test('serves an authenticated MCP initialize request over JSON HTTP', async () =
 
     assert.equal(response.status, 200);
     assert.equal(body.result?.serverInfo?.name, 'bg-mcp-http');
+});
+
+test('serves an MCP initialize request authenticated by URL token', async () => {
+    process.env['MCP_BEARER_TOKEN'] = 'test-secret';
+    const response = await app.request('/mcp?token=test-secret', {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json, text/event-stream',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: {
+                protocolVersion: '2025-06-18',
+                capabilities: {},
+                clientInfo: { name: 'test-client', version: '1.0.0' },
+            },
+        }),
+    });
+    const body = (await response.json()) as {
+        result?: { serverInfo?: { name?: string } };
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(body.result?.serverInfo?.name, 'bg-mcp-http');
+});
+
+test('rejects an incorrect URL token', async () => {
+    process.env['MCP_BEARER_TOKEN'] = 'test-secret';
+    const response = await app.request('/mcp?token=wrong-secret', { method: 'POST' });
+
+    assert.equal(response.status, 401);
 });
 
 function restore(name: string, value: string | undefined): void {

@@ -24,7 +24,7 @@ app.get('/health', (context) => {
 });
 
 app.all('/mcp', async (context) => {
-    if (!hasValidBearer(context.req.header('authorization'))) {
+    if (!hasValidCredential(context.req.header('authorization'), context.req.query('token'))) {
         return context.json(
             {
                 jsonrpc: '2.0',
@@ -70,15 +70,20 @@ app.all('/mcp', async (context) => {
     }
 });
 
-function hasValidBearer(authorization: string | undefined): boolean {
+function hasValidCredential(authorization: string | undefined, queryToken: string | undefined): boolean {
     let expected: string;
     try {
         expected = getBearerToken();
     } catch {
         return false;
     }
-    if (!authorization?.startsWith('Bearer ')) return false;
-    const supplied = authorization.slice('Bearer '.length);
+
+    const bearer = authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined;
+    return securelyMatches(bearer, expected) || securelyMatches(queryToken, expected);
+}
+
+function securelyMatches(supplied: string | undefined, expected: string): boolean {
+    if (supplied === undefined) return false;
     const suppliedBuffer = Buffer.from(supplied);
     const expectedBuffer = Buffer.from(expected);
     return suppliedBuffer.length === expectedBuffer.length && timingSafeEqual(suppliedBuffer, expectedBuffer);

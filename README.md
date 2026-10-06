@@ -2,13 +2,13 @@
 
 Servidor MCP remoto y **de solo lectura** para Banco General, expuesto por HTTPS
 con el transporte oficial **Streamable HTTP**. Está pensado para desplegarse en
-Vercel y para que el cliente MCP solo conozca un Bearer token; las credenciales
+Vercel y para que el cliente MCP solo conozca un token fijo; las credenciales
 del banco permanecen como secretos privados del servidor.
 
 ## Seguridad y arquitectura
 
-- `POST /mcp` exige `Authorization: Bearer <token>` y compara el token en tiempo
-  constante.
+- `POST /mcp` acepta `Authorization: Bearer <token>` o el parámetro
+  `?token=<token>` y compara cualquiera de los dos en tiempo constante.
 - El MCP no publica tools de login ni recibe usuario, contraseña, respuesta de
   seguridad o rutas bancarias desde el agente.
 - El servidor inicia sesión automáticamente con `BG_USERNAME`, `BG_PASSWORD` y
@@ -84,6 +84,17 @@ Los secretos no se incluyen durante la build ni en el repositorio. Después de
 cambiar uno, crea un deployment nuevo.
 
 ## Conectar un cliente MCP
+
+En ChatGPT, usa la URL completa como URL del servidor MCP, reemplazando
+`TU_TOKEN` por el mismo valor configurado en `MCP_BEARER_TOKEN`:
+
+```text
+https://TU-PROYECTO.vercel.app/mcp?token=TU_TOKEN
+```
+
+El token en la URL puede quedar visible en la configuración de la conexión y en
+logs de acceso. Trátalo como un secreto y rota `MCP_BEARER_TOKEN` en Vercel si
+se expone. El servidor no imprime la URL ni el token en sus propios logs.
 
 En Codex, guarda el Bearer en una variable local y referencia esa variable desde
 la configuración; el valor no se escribe en el archivo:
