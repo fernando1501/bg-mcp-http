@@ -147,6 +147,48 @@ test('card tools reject an incomplete period before calling Banco General', asyn
     }
 });
 
+test('card transaction date ranges reject incomplete, reversed or mixed inputs', async () => {
+    process.env['MCP_BEARER_TOKEN'] = 'test-secret';
+    const cases = [
+        { arguments: { portalId: 1, fromDate: '2026-10-04' }, code: 'INVALID_ARGS' },
+        {
+            arguments: {
+                portalId: 1,
+                fromDate: '2026-10-04',
+                toDate: '2026-10-04',
+                month: 10,
+                year: 2026,
+            },
+            code: 'INVALID_ARGS',
+        },
+        {
+            arguments: { portalId: 1, fromDate: '2026-10-05', toDate: '2026-10-04' },
+            code: 'INVALID_RANGE',
+        },
+    ];
+
+    for (const item of cases) {
+        const response = await app.request('/mcp?token=test-secret', {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json, text/event-stream',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/call',
+                params: { name: 'bg_list_card_transactions', arguments: item.arguments },
+            }),
+        });
+        const body = (await response.json()) as {
+            result?: { content?: Array<{ type: string; text?: string }> };
+        };
+        const resultText = body.result?.content?.find(({ type }) => type === 'text')?.text ?? '{}';
+        assert.equal(JSON.parse(resultText).code, item.code);
+    }
+});
+
 test('publishes credit-card cutoff semantics in the MCP tool schema', async () => {
     process.env['MCP_BEARER_TOKEN'] = 'test-secret';
     const response = await app.request('/mcp?token=test-secret', {
@@ -169,16 +211,17 @@ test('publishes credit-card cutoff semantics in the MCP tool schema', async () =
     const tool = body.result?.tools?.find(({ name }) => name === 'bg_list_card_transactions');
 
     assert.equal(response.status, 200);
-    assert.match(tool?.description ?? '', /OMIT both month and year/);
+    assert.match(tool?.description ?? '', /PREFER fromDate\/toDate/);
     assert.match(tool?.description ?? '', /month=0\/year=0/);
     assert.match(tool?.description ?? '', /statementHistory\.cutDateLocal/);
     assert.match(tool?.inputSchema?.properties?.['month']?.description ?? '', /CLOSED statement/);
     assert.match(tool?.inputSchema?.properties?.['year']?.description ?? '', /current open statement/);
+    assert.match(tool?.inputSchema?.properties?.['fromDate']?.description ?? '', /Calendar start date/);
 
     const searchTool = body.result?.tools?.find(({ name }) => name === 'bg_search_transactions');
     const summaryTool = body.result?.tools?.find(({ name }) => name === 'bg_spending_summary');
-    assert.match(searchTool?.description ?? '', /partialFailures is not evidence/);
-    assert.match(summaryTool?.description ?? '', /OMITTING month\/year/);
+    assert.match(searchTool?.description ?? '', /automatically include/);
+    assert.match(summaryTool?.description ?? '', /current open 0\/0 statement/);
 });
 
 function restore(name: string, value: string | undefined): void {

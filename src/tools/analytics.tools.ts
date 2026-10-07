@@ -10,7 +10,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { getPendingPurchases, listAccounts } from '../api/accounts.js';
-import { getCardMovements, normalizeCardMovements } from '../api/cards.js';
+import { getCardMovementsForDateRange, normalizeCardMovements } from '../api/cards.js';
 import {
     clampToDateRange,
     monthRange,
@@ -71,18 +71,14 @@ async function collectAll(
         }
     }
 
-    // Card statements are addressed by period, not date range, so pull every
-    // period the range touches and let the date clamp sort it out.
+    // The card helper includes the open 0/0 statement plus overlapping closed
+    // cutoffs, then deduplicates them before this function applies its clamp.
     for (const card of cards) {
-        for (const { month, year } of monthsBetween(fromDate, toDate)) {
-            try {
-                const raw = await getCardMovements(card.portalId, month, year);
-                transactions.push(...normalizeCardMovements(raw, card));
-            } catch (err) {
-                errors.push(
-                    `${card.alias} ${year}-${month}: ${err instanceof Error ? err.message : String(err)}`,
-                );
-            }
+        try {
+            const raw = await getCardMovementsForDateRange(card.portalId, fromDate, toDate);
+            transactions.push(...normalizeCardMovements(raw, card));
+        } catch (err) {
+            errors.push(`${card.alias}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }
 
@@ -103,28 +99,6 @@ async function collectAll(
     };
 }
 
-function monthsBetween(fromDate: string, toDate: string): Array<{ month: number; year: number }> {
-    const out: Array<{ month: number; year: number }> = [];
-    const [fy, fm] = fromDate.split('-').map(Number);
-    const [ty, tm] = toDate.split('-').map(Number);
-    let year = fy ?? 1970;
-    let month = fm ?? 1;
-    // A charge posted late can land in the following statement, so include one
-    // extra period past the end of the range.
-    const lastYear = ty ?? year;
-    const lastMonth = (tm ?? month) + 1;
-    while (year * 12 + month <= lastYear * 12 + lastMonth) {
-        out.push({ month, year });
-        month += 1;
-        if (month > 12) {
-            month = 1;
-            year += 1;
-        }
-        if (out.length > 24) break; // Guard against an absurd range.
-    }
-    return out;
-}
-
 export function registerAnalyticsTools(server: McpServer): void {
     server.registerTool(
         'bg_search_transactions',
@@ -135,9 +109,8 @@ export function registerAnalyticsTools(server: McpServer): void {
                 'by description text and amount. Use this for questions like "how much did I spend at X" or ' +
                 '"find that $250 charge in March" — it saves calling the per-account tools one by one. ' +
                 'Covers pending purchases ("Compras en proceso") as well as posted movements, so a charge made ' +
-                'today is findable; those come back with source "pending". For an exact current/recent credit-card ' +
-                'date, confirm with bg_list_card_transactions while OMITTING month/year so BG uses its open 0/0 ' +
-                'period. A card entry in partialFailures is not evidence that no matching charge exists.',
+                'today is findable; those come back with source "pending". Credit-card date ranges automatically ' +
+                'include BG\'s current open 0/0 statement and relevant closed statements.',
             inputSchema: {
                 fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Start date, YYYY-MM-DD (Panama time).'),
                 toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('End date, YYYY-MM-DD (Panama time).'),
@@ -218,8 +191,8 @@ export function registerAnalyticsTools(server: McpServer): void {
             description:
                 'Aggregates every account for a month (or an explicit date range): total income, total spending, ' +
                 'net, a per-account breakdown and the largest transactions. Use this for "how did I do this month". ' +
-                'If current/recent card accuracy matters and a card appears in partialFailures, confirm it with ' +
-                'bg_list_card_transactions while OMITTING month/year so BG uses the current open 0/0 period.',
+                'Credit-card ranges automatically include BG\'s current open 0/0 statement and relevant closed ' +
+                'statements.',
             inputSchema: {
                 month: z
                     .string()

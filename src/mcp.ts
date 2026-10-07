@@ -19,9 +19,9 @@ export function createMcpServer(): McpServer {
                 'sends Banco General month=0/year=0. Never pass the current calendar month/year merely to search ' +
                 'for a date, because BG returns 400 Error de WS for a statement that has not closed. To choose a ' +
                 'historical period, first read statementHistory from bg_get_card_statement and use the month/year ' +
-                'of an available cutDateLocal. When verifying an exact current/recent credit-card date, call ' +
-                'bg_list_card_transactions directly with month/year omitted and filter its returned dates; do not ' +
-                'treat a partial card failure from an aggregate search or summary as proof that no charge exists.',
+                'of an available cutDateLocal. When verifying an exact credit-card day or calendar range, prefer ' +
+                'bg_list_card_transactions with fromDate/toDate; the server selects 0/0 and relevant closed ' +
+                'statements automatically and filters the returned dates.',
         },
     );
 

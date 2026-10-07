@@ -7,11 +7,12 @@
  * callers that want a calendar month must clamp the results by date.
  */
 
-import { bank } from '../http/client.js';
+import { PANAMA_OFFSET_HOURS } from '../config.js';
+import { bank, BankApiError } from '../http/client.js';
 import { cardReferer } from './accounts.js';
 import { natureToType, toLocalDate, type Transaction } from './normalize.js';
 
-interface RawCardMovement {
+export interface RawCardMovement {
     id?: string;
     dateMovement?: number;
     effectiveDate?: number;
@@ -92,6 +93,105 @@ export async function getCardMovements(
     month: number,
     year: number,
 ): Promise<RawCardMovement[]> {
+    try {
+        return await fetchCardMovements(portalId, month, year);
+    } catch (error) {
+        // Agents naturally translate "October 4" to month=10/year=2026, but BG
+        // rejects the current, not-yet-closed cutoff with its internal WS 412.
+        // Treat that specific current-month request as the open 0/0 period.
+        if (
+            month !== 0 &&
+            year !== 0 &&
+            isCurrentPanamaMonth(month, year) &&
+            isUnavailableStatementError(error)
+        ) {
+            return fetchCardMovements(portalId, 0, 0);
+        }
+        throw error;
+    }
+}
+
+/**
+ * Movements for a calendar date range. The open 0/0 statement is always read,
+ * then the possibly-overlapping closed cutoff periods are merged and deduped.
+ */
+export async function getCardMovementsForDateRange(
+    portalId: number,
+    fromDate: string,
+    toDate: string,
+): Promise<RawCardMovement[]> {
+    const all: RawCardMovement[] = [];
+    let successfulRequests = 0;
+    let openPeriodError: unknown;
+
+    for (const { month, year } of cardStatementPeriodsForDateRange(fromDate, toDate)) {
+        try {
+            all.push(...(await fetchCardMovements(portalId, month, year)));
+            successfulRequests += 1;
+        } catch (error) {
+            if (month === 0 && year === 0) {
+                openPeriodError = error;
+                continue;
+            }
+            // The current/future cutoff may not exist yet. That is expected as
+            // long as another period (normally 0/0) answered successfully.
+            if (isCurrentOrFuturePanamaMonth(month, year) && isUnavailableStatementError(error)) {
+                continue;
+            }
+            throw error;
+        }
+    }
+
+    if (successfulRequests === 0 && openPeriodError) throw openPeriodError;
+    return dedupeRawCardMovements(all);
+}
+
+export function cardStatementPeriodsForDateRange(
+    fromDate: string,
+    toDate: string,
+): Array<{ month: number; year: number }> {
+    const periods = [{ month: 0, year: 0 }];
+    const [fromYear = 1970, fromMonth = 1] = fromDate.split('-').map(Number);
+    const [toYear = fromYear, toMonth = fromMonth] = toDate.split('-').map(Number);
+    let year = fromYear;
+    let month = fromMonth;
+    const finalIndex = toYear * 12 + toMonth + 1;
+
+    // A calendar date can belong to a statement whose cutoff is in the same or
+    // following month, so include one cutoff month beyond the requested range.
+    while (year * 12 + month <= finalIndex && periods.length <= 25) {
+        periods.push({ month, year });
+        month += 1;
+        if (month > 12) {
+            month = 1;
+            year += 1;
+        }
+    }
+    return periods;
+}
+
+export function isCurrentPanamaMonth(month: number, year: number, now = Date.now()): boolean {
+    const panamaNow = new Date(now - PANAMA_OFFSET_HOURS * 3_600_000);
+    return month === panamaNow.getUTCMonth() + 1 && year === panamaNow.getUTCFullYear();
+}
+
+function isCurrentOrFuturePanamaMonth(month: number, year: number): boolean {
+    const panamaNow = new Date(Date.now() - PANAMA_OFFSET_HOURS * 3_600_000);
+    const currentIndex = panamaNow.getUTCFullYear() * 12 + panamaNow.getUTCMonth() + 1;
+    return year * 12 + month >= currentIndex;
+}
+
+function isUnavailableStatementError(error: unknown): boolean {
+    if (!(error instanceof BankApiError) || error.status !== 400) return false;
+    const body = error.body as Record<string, unknown> | null;
+    return String(body?.['id'] ?? '') === '412' || Number(body?.['statusCode']) === 412;
+}
+
+async function fetchCardMovements(
+    portalId: number,
+    month: number,
+    year: number,
+): Promise<RawCardMovement[]> {
     const res = await bank.post<CardFindResponse>(
         '/o/api/product-info/credit-card/find',
         { productId: String(portalId), month, year },
@@ -105,6 +205,23 @@ export async function getCardMovements(
         }
     }
     return all;
+}
+
+function dedupeRawCardMovements(movements: RawCardMovement[]): RawCardMovement[] {
+    const seen = new Set<string>();
+    return movements.filter((movement) => {
+        const key = [
+            movement.id,
+            movement.dateMovement ?? movement.effectiveDate,
+            movement.amountMovement,
+            movement.natureMovement,
+            movement.description,
+            movement._cardLabel,
+        ].join('#');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 
 export function normalizeCardMovements(

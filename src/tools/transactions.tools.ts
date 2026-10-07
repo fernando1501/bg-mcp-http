@@ -4,7 +4,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { findAccount, getPendingPurchases } from '../api/accounts.js';
-import { getCardMovements, normalizeCardMovements } from '../api/cards.js';
+import {
+    getCardMovements,
+    getCardMovementsForDateRange,
+    normalizeCardMovements,
+} from '../api/cards.js';
 import { clampToDateRange, parseLocalDate } from '../api/normalize.js';
 import { getSavingsMovements, normalizeSavingsMovements } from '../api/savings.js';
 import { errorResult, guarded, jsonResult, limited, validateOptionalPeriod } from './helpers.js';
@@ -138,7 +142,9 @@ export function registerTransactionTools(server: McpServer): void {
         {
             title: 'List credit card transactions',
             description:
-                'Charges and payments for one credit-card statement period. IMPORTANT: month/year are NOT a ' +
+                'Charges and payments for one credit card. For a day or calendar range, PREFER fromDate/toDate; ' +
+                'the server automatically reads the open 0/0 period plus relevant closed statements, deduplicates ' +
+                'them and filters exact Panama-local dates. Alternatively, month/year are NOT a ' +
                 'calendar-month search; they identify a CLOSED statement by its cutoff month and year. For the ' +
                 'current open statement, today, or a recent date after the latest cutoff, OMIT both month and ' +
                 'year. The server converts that omission to BG month=0/year=0. Never pass the current calendar ' +
@@ -147,6 +153,12 @@ export function registerTransactionTools(server: McpServer): void {
                 'statementHistory.cutDateLocal. Filter the returned transactions by date when looking for one day.',
             inputSchema: {
                 portalId: z.number().int().describe('Credit card portalId from bg_list_accounts.'),
+                fromDate: isoDate
+                    .optional()
+                    .describe('Calendar start date in Panama time. Provide together with toDate; do not mix with month/year.'),
+                toDate: isoDate
+                    .optional()
+                    .describe('Calendar end date in Panama time. Provide together with fromDate; do not mix with month/year.'),
                 month: z
                     .number()
                     .int()
@@ -182,17 +194,31 @@ export function registerTransactionTools(server: McpServer): void {
         guarded(
             async ({
                 portalId,
+                fromDate,
+                toDate,
                 month,
                 year,
                 clampToMonth,
                 limit,
             }: {
                 portalId: number;
+                fromDate?: string;
+                toDate?: string;
                 month?: number;
                 year?: number;
                 clampToMonth?: boolean;
                 limit?: number;
             }) => {
+                const hasDateRange = fromDate !== undefined || toDate !== undefined;
+                if ((fromDate === undefined) !== (toDate === undefined)) {
+                    return errorResult('fromDate and toDate must be provided together.', 'INVALID_ARGS');
+                }
+                if (hasDateRange && (month !== undefined || year !== undefined)) {
+                    return errorResult('Use either fromDate/toDate or month/year, not both.', 'INVALID_ARGS');
+                }
+                if (fromDate !== undefined && toDate !== undefined && fromDate > toDate) {
+                    return errorResult('fromDate must be on or before toDate.', 'INVALID_RANGE');
+                }
                 const periodError = validateOptionalPeriod(month, year);
                 if (periodError) return periodError;
 
@@ -209,15 +235,22 @@ export function registerTransactionTools(server: McpServer): void {
                         'WRONG_ACCOUNT_TYPE',
                     );
                 }
+                if (clampToMonth && hasDateRange) {
+                    return errorResult('clampToMonth cannot be combined with fromDate/toDate.', 'INVALID_ARGS');
+                }
                 if (clampToMonth && (month === undefined || year === undefined)) {
                     return errorResult('clampToMonth requires both month and year.', 'INVALID_ARGS');
                 }
 
-                // BG treats 0/0 as "current statement period".
-                const raw = await getCardMovements(portalId, month ?? 0, year ?? 0);
+                const raw =
+                    fromDate !== undefined && toDate !== undefined
+                        ? await getCardMovementsForDateRange(portalId, fromDate, toDate)
+                        : await getCardMovements(portalId, month ?? 0, year ?? 0);
                 let all = normalizeCardMovements(raw, account);
 
-                if (clampToMonth && month !== undefined && year !== undefined) {
+                if (fromDate !== undefined && toDate !== undefined) {
+                    all = clampToDateRange(all, fromDate, toDate);
+                } else if (clampToMonth && month !== undefined && year !== undefined) {
                     const prefix = `${year}-${String(month).padStart(2, '0')}`;
                     all = all.filter((t) => t.date.startsWith(prefix));
                 }
@@ -229,7 +262,16 @@ export function registerTransactionTools(server: McpServer): void {
 
                 return jsonResult({
                     card: { portalId, alias: account.alias, maskedNumber: account.maskedNumber },
-                    period: month && year ? `${year}-${String(month).padStart(2, '0')}` : 'current',
+                    period:
+                        fromDate !== undefined && toDate !== undefined
+                            ? 'date-range'
+                            : month && year
+                              ? `${year}-${String(month).padStart(2, '0')}`
+                              : 'current',
+                    range:
+                        fromDate !== undefined && toDate !== undefined
+                            ? { fromDate, toDate }
+                            : undefined,
                     clampedToCalendarMonth: clampToMonth ?? false,
                     total,
                     returned: items.length,

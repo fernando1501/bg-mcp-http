@@ -154,11 +154,11 @@ septiembre, enviar octubre antes del corte de octubre puede producir
 - Para un estado histórico, llama primero `bg_get_card_statement` sin mes ni año
   y revisa `statementHistory[].cutDateLocal`. Usa únicamente el mes y año de una
   fecha de corte que aparezca allí.
-- Para buscar un día concreto dentro del ciclo abierto, llama
-  `bg_list_card_transactions` sin mes ni año y filtra por el campo `date` de los
-  movimientos devueltos.
-- Si `bg_search_transactions` o `bg_spending_summary` informa una tarjeta en
-  `partialFailures`, no concluyas que no hubo movimientos. Confirma esa tarjeta
-  con `bg_list_card_transactions` sin mes ni año.
+- Para buscar un día o rango calendario concreto, usa `fromDate` y `toDate` en
+  `bg_list_card_transactions`. El servidor consulta el ciclo abierto `0/0` y
+  los cortes cerrados que puedan solaparse, elimina duplicados y filtra las
+  fechas solicitadas.
+- `bg_search_transactions` y `bg_spending_summary` utilizan la misma selección
+  automática de períodos para las tarjetas.
 - Nunca envíes literalmente cero en la llamada MCP: el agente debe omitir ambos
   parámetros; la conversión a `0/0` ocurre dentro del servidor.
