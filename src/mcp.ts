@@ -21,7 +21,7 @@ export function createMcpServer(): McpServer {
                 'historical period, first read statementHistory from bg_get_card_statement and use the month/year ' +
                 'of an available cutDateLocal. When verifying an exact credit-card day or calendar range, prefer ' +
                 'bg_list_card_transactions with fromDate/toDate; the server selects 0/0 and relevant closed ' +
-                'statements automatically and filters the returned dates.',
+                'statements automatically and matches both the posting date and BG effective date.',
         },
     );
 

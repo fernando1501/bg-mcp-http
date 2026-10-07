@@ -6,6 +6,7 @@ import {
     getCardMovements,
     getCardMovementsForDateRange,
     isCurrentPanamaMonth,
+    normalizeCardMovements,
 } from '../src/api/cards.js';
 import { bank, BankApiError } from '../src/http/client.js';
 
@@ -87,4 +88,20 @@ test('calendar range keeps open-period data and ignores unopened cutoff candidat
     } finally {
         bank.post = originalPost;
     }
+});
+
+test('normalizes both the card movement date and effective date', () => {
+    const [movement] = normalizeCardMovements(
+        [
+            {
+                id: 'charge',
+                dateMovement: Date.UTC(2026, 9, 6, 12),
+                effectiveDate: Date.UTC(2026, 9, 5, 12),
+            },
+        ],
+        { portalId: 3, alias: 'card', maskedNumber: 'masked' },
+    );
+
+    assert.equal(movement?.date, '2026-10-06');
+    assert.equal(movement?.effectiveDate, '2026-10-05');
 });

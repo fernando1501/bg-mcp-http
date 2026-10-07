@@ -32,6 +32,11 @@ export interface Transaction {
     date: string;
     /** Original UTC epoch ms, kept so callers can sort precisely. */
     timestamp: number;
+    /**
+     * Credit cards only: the day on which BG made the movement effective.
+     * This can differ from `date` when a purchase posts on a later day.
+     */
+    effectiveDate?: string;
     account: string;
     accountPortalId: number;
     description: string;
@@ -105,7 +110,13 @@ export function clampToDateRange(
     fromDate: string,
     toDate: string,
 ): Transaction[] {
-    return transactions.filter((t) => t.date >= fromDate && t.date <= toDate);
+    return transactions.filter(
+        (t) =>
+            (t.date >= fromDate && t.date <= toDate) ||
+            (t.effectiveDate !== undefined &&
+                t.effectiveDate >= fromDate &&
+                t.effectiveDate <= toDate),
+    );
 }
 
 interface RawAccount {

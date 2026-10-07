@@ -157,7 +157,9 @@ septiembre, enviar octubre antes del corte de octubre puede producir
 - Para buscar un día o rango calendario concreto, usa `fromDate` y `toDate` en
   `bg_list_card_transactions`. El servidor consulta el ciclo abierto `0/0` y
   los cortes cerrados que puedan solaparse, elimina duplicados y filtra las
-  fechas solicitadas.
+  fechas solicitadas. Para tarjetas, una coincidencia puede venir de `date`
+  (fecha de movimiento/contabilización) o `effectiveDate` (fecha efectiva), ya
+  que una compra puede contabilizarse al día siguiente.
 - `bg_search_transactions` y `bg_spending_summary` utilizan la misma selección
   automática de períodos para las tarjetas.
 - Nunca envíes literalmente cero en la llamada MCP: el agente debe omitir ambos

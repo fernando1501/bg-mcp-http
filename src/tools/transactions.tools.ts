@@ -144,7 +144,8 @@ export function registerTransactionTools(server: McpServer): void {
             description:
                 'Charges and payments for one credit card. For a day or calendar range, PREFER fromDate/toDate; ' +
                 'the server automatically reads the open 0/0 period plus relevant closed statements, deduplicates ' +
-                'them and filters exact Panama-local dates. Alternatively, month/year are NOT a ' +
+                'them and matches either the movement/posting date (`date`) or BG effective date ' +
+                '(`effectiveDate`), since a purchase can post on the following day. Alternatively, month/year are NOT a ' +
                 'calendar-month search; they identify a CLOSED statement by its cutoff month and year. For the ' +
                 'current open statement, today, or a recent date after the latest cutoff, OMIT both month and ' +
                 'year. The server converts that omission to BG month=0/year=0. Never pass the current calendar ' +

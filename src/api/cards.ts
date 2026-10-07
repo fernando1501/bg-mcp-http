@@ -230,10 +230,14 @@ export function normalizeCardMovements(
 ): Transaction[] {
     return movements.map((m) => {
         const timestamp = m.dateMovement ?? m.effectiveDate ?? 0;
+        const effectiveDate = toLocalDate(m.effectiveDate);
         return {
             id: String(m.id ?? ''),
             date: toLocalDate(timestamp),
             timestamp,
+            // A purchase made on one day can post on the next. Keep BG's
+            // effective day so exact-date searches can match either meaning.
+            effectiveDate: effectiveDate || undefined,
             account: m._cardLabel ? `${account.alias} ${m._cardLabel}` : account.alias,
             accountPortalId: account.portalId,
             description: (m.description ?? '').trim(),

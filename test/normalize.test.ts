@@ -78,6 +78,11 @@ test('clampToDateRange drops BG overshoot on both ends', () => {
     assert.deepEqual(kept, ['2026-07-01', '2026-07-15', '2026-07-31']);
 });
 
+test('clampToDateRange keeps a card charge whose effective day is in range', () => {
+    const charge = { ...tx('2026-10-05'), source: 'credit-card' as const, effectiveDate: '2026-10-04' };
+    assert.deepEqual(clampToDateRange([charge], '2026-10-04', '2026-10-04'), [charge]);
+});
+
 test('flattenAccounts walks group → product → accounts', () => {
     const accounts = flattenAccounts([
         {

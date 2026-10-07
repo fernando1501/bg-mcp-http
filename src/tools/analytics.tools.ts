@@ -110,7 +110,8 @@ export function registerAnalyticsTools(server: McpServer): void {
                 '"find that $250 charge in March" — it saves calling the per-account tools one by one. ' +
                 'Covers pending purchases ("Compras en proceso") as well as posted movements, so a charge made ' +
                 'today is findable; those come back with source "pending". Credit-card date ranges automatically ' +
-                'include BG\'s current open 0/0 statement and relevant closed statements.',
+                'include BG\'s current open 0/0 statement and relevant closed statements, and match both the ' +
+                'movement/posting date and BG effective date.',
             inputSchema: {
                 fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Start date, YYYY-MM-DD (Panama time).'),
                 toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('End date, YYYY-MM-DD (Panama time).'),
