@@ -10,18 +10,22 @@ import {
 } from './normalize.js';
 
 export async function listAccounts(): Promise<Account[]> {
-    const groups = await bank.get<unknown>('/o/api/dashboard/product');
-    // BG doesn't always answer an unauthenticated request with a redirect: it
-    // can return 200 and a payload that simply isn't the product list. That
-    // flattens to zero accounts, and a dead session ends up reading as "you
-    // have no money" all the way up to the spending summary. Anything that
-    // isn't the expected array is a session problem, not an empty portfolio.
-    if (!Array.isArray(groups)) {
-        throw new SessionExpiredError(
-            'Banco General did not return the product list, which means the session is not usable.',
-        );
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const groups = await bank.get<unknown>('/o/api/dashboard/product');
+        if (Array.isArray(groups)) {
+            return flattenAccounts(groups as Parameters<typeof flattenAccounts>[0]);
+        }
+
+        // BG can answer an expired session with HTTP 200 and a login-shaped
+        // payload instead of a redirect. The HTTP client cannot identify that
+        // response generically, so invalidate here and let the second bank.get
+        // perform the normal automatic login before retrying once.
+        bank.invalidateSession();
     }
-    return flattenAccounts(groups as Parameters<typeof flattenAccounts>[0]);
+
+    throw new SessionExpiredError(
+        'Banco General did not return the product list after an automatic re-login.',
+    );
 }
 
 /** Looks up one account in the dashboard listing by its portalId. */

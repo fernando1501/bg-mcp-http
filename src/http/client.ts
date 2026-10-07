@@ -69,6 +69,11 @@ export class BankClient {
         return loadSession();
     }
 
+    invalidateSession(): void {
+        clearSession();
+        this.http = null;
+    }
+
     async get<T = unknown>(path: string, referer?: string): Promise<T> {
         assertReadOnly('GET', path);
         return this.request<T>('GET', path, undefined, referer);
@@ -101,8 +106,7 @@ export class BankClient {
             method === 'GET' ? await http.get(path, config) : await http.post(path, body, config);
 
         if (isSessionExpiredResponse(response)) {
-            clearSession();
-            this.http = null;
+            this.invalidateSession();
             if (retry) return this.request<T>(method, path, body, referer, false);
             throw new SessionExpiredError();
         }
